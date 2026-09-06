@@ -277,12 +277,10 @@ const rawPool = [
   { w: "Können", a: "das", e: "nominalized verb", m: "Skill, Ability / ہنر" }
 ];
 
-// Seeded generator to build exactly 300 unique words (100 per Level)
 const levels = { 1: [], 2: [], 3: [] };
 
 function buildDatabase() {
   const combined = [...rawPool];
-  // Auto-expand standard German compound stems to fill exactly 300 words without repeating meanings
   const prefixes = ["Haupt", "Vor", "Nach", "Klein", "Groß", "Alt", "Neu", "Grund", "Fern", "Lokal"];
   let i = 0;
   while (combined.length < 300) {
@@ -297,7 +295,6 @@ function buildDatabase() {
     i++;
   }
 
-  // Shuffle evenly
   const shuffled = combined.slice(0, 300).sort(() => 0.5 - Math.random());
   levels[1] = shuffled.slice(0, 100);
   levels[2] = shuffled.slice(100, 200);
@@ -345,4 +342,66 @@ function handleChoice(userPick) {
   feedback.style.display = "block";
   document.getElementById("next-btn").style.display = "block";
 
-  if (userPick === current
+  if (userPick === current.a) {
+    const points = meaningGiven ? 1.0 : 0.75;
+    score += points;
+    feedback.className = "feedback correct";
+    feedback.innerHTML = `
+      <strong>Correct! (${current.a} ${current.w})</strong><br>
+      Ending Rule: <strong>${current.e}</strong><br>
+      <div class="mnemonic">${mnemonics[current.a]}</div>
+      Meaning: ${current.m}<br>
+      <em>Points earned: +${points}</em>
+    `;
+  } else {
+    feedback.className = "feedback incorrect";
+    feedback.innerHTML = `
+      <strong>Incorrect!</strong> Correct is: <strong>${current.a} ${current.w}</strong><br>
+      Ending Rule: <strong>${current.e}</strong><br>
+      <div class="mnemonic">${mnemonics[current.a]}</div>
+      Meaning: ${current.m}<br>
+      <em>Points earned: 0.0</em>
+    `;
+  }
+  document.getElementById("score-badge").innerText = `Score: ${score.toFixed(2)}`;
+}
+
+function nextWord() {
+  const pool = levels[currentLevel];
+  currentIndex++;
+  if (currentIndex < pool.length) {
+    loadWord();
+  } else {
+    alert(`🎉 Congratulations! You completed Level ${currentLevel}!\nFinal Score: ${score.toFixed(2)} / ${pool.length}`);
+    if (currentLevel < 3) {
+      switchLevel(currentLevel + 1);
+      document.getElementById("level-selector").value = currentLevel;
+    } else {
+      switchLevel(1);
+    }
+  }
+}
+
+// Start Level 1
+loadWord();
+
+// Service Worker for 100% Offline Capability
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    const swCode = `
+      const CACHE_NAME = 'german-quiz-v2';
+      self.addEventListener('install', e => {
+        e.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(['./'])));
+      });
+      self.addEventListener('fetch', e => {
+        e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
+      });
+    `;
+    const blob = new Blob([swCode], { type: 'application/javascript' });
+    navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(() => {});
+  });
+}
+</script>
+
+</body>
+</html>
