@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ur" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>German Gender Quiz Pro</title>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: #0b0f19; color: #f8fafc; margin: 0; padding: 15px; display: flex; justify-content: center; min-height: 100vh; align-items: center; }
+    .card { background: #1e293b; padding: 20px; border-radius: 16px; max-width: 480px; width: 100%; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+    .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .level-badge { background: #f59e0b; color: #000; padding: 4px 10px; border-radius: 20px; font-weight: bold; font-size: 13px; }
+    .score-badge { color: #38bdf8; font-weight: 600; font-size: 15px; }
+    .progress-text { font-size: 13px; color: #94a3b8; text-align: center; margin-bottom: 10px; }
+    .progress-bar-bg { background: #334155; height: 6px; border-radius: 4px; overflow: hidden; margin-bottom: 20px; }
+    .progress-bar-fill { background: #38bdf8; height: 100%; width: 0%; transition: width 0.3s ease; }
+    .question { text-align: center; margin-bottom: 20px; }
+    .word { font-size: 32px; font-weight: 800; color: #f8fafc; margin: 10px 0; letter-spacing: 0.5px; }
+    .input-box { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: white; margin-bottom: 15px; font-size: 15px; }
+    .input-box:focus { border-color: #38bdf8; outline: none; }
+    .options { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+    button { padding: 14px; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; transition: transform 0.1s ease; }
+    button:active { transform: scale(0.97); }
+    .btn-der { background: #2563eb; color: white; }
+    .btn-die { background: #db2777; color: white; }
+    .btn-das { background: #059669; color: white; }
+    .feedback { padding: 14px; border-radius: 8px; margin-top: 15px; display: none; line-height: 1.5; font-size: 15px; }
+    .correct { background: #064e3b; border-left: 5px solid #10b981; }
+    .incorrect { background: #4c0519; border-left: 5px solid #f43f5e; }
+    .mnemonic { font-weight: bold; color: #facc15; margin: 6px 0; font-size: 14px; }
+    .next-btn { width: 100%; background: #4f46e5; color: white; padding: 14px; border-radius: 8px; margin-top: 15px; display: none; }
+    .level-select { width: 100%; background: #0f172a; color: #94a3b8; border: 1px solid #334155; padding: 6px 10px; border-radius: 6px; margin-bottom: 15px; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <div class="header-bar">
+    <span class="level-badge" id="level-badge">Level 1</span>
+    <span class="score-badge" id="score-badge">Score: 0.0</span>
+  </div>
+
+  <select id="level-selector" class="level-select" onchange="switchLevel(this.value)">
+    <option value="1">Level 1: Essential Suffixes (100 Words)</option>
+    <option value="2">Level 2: Intermediate & Abstract (100 Words)</option>
+    <option value="3">Level 3: Advanced Academic & Technical (100 Words)</option>
+  </select>
+
+  <div class="progress-bar-bg">
+    <div class="progress-bar-fill" id="progress-fill"></div>
+  </div>
+  <div class="progress-text" id="progress-text">Word 1 of 100</div>
+
+  <div class="question">
+    <span style="color: #94a3b8; font-size: 14px;">Select the right article:</span>
+    <div class="word" id="target-word">_ _ _ Wort</div>
+  </div>
+
+  <input type="text" id="meaning-input" class="input-box" placeholder="Meaning in Urdu or English (for full 1.0 pt)...">
+
+  <div class="options" id="options-container">
+    <button class="btn-der" onclick="handleChoice('der')">der</button>
+    <button class="btn-die" onclick="handleChoice('die')">die</button>
+    <button class="btn-das" onclick="handleChoice('das')">das</button>
+  </div>
+
+  <div id="feedback" class="feedback"></div>
+  <button id="next-btn" class="next-btn" onclick="nextWord()">Next Word ➔</button>
+</div>
+
+<script>
+const mnemonics = {
+  der: "Der orenig ismus ling",
+  die: "Die heit keit schaftung tätion ikurei اک اڑائ",
+  das: "Das chen lein ummagement"
+};
+
+// 300 Valid Real German Nouns Categorized into 3 Levels (100 each)
+const rawPool = [
+  // --- DER WORDS (-or, -en, -ig, -ismus, -ling) ---
+  { w: "Motor", a: "der", e: "-or", m: "Engine / موٹر یا انجن" },
+  { w: "Reaktor", a: "der", e: "-or", m: "Reactor / ری ایکٹر" },
+  { w: "Traktor", a: "der", e: "-or", m: "Tractor / ٹریکٹر" },
+  { w: "Autor", a: "der", e: "-or", m: "Author / مصنف" },
+  { w: "Doktor", a: "der", e: "-or", m: "Doctor / ڈاکٹر" },
+  { w: "Faktor", a: "der", e: "-or", m: "Factor / عنصر" },
+  { w: "Sensor", a: "der", e: "-or", m: "Sensor / سینسر" },
+  { w: "Sektor", a: "der", e: "-or", m: "Sector / شعبہ" },
+  { w: "Direktor", a: "der", e: "-or", m: "Director / ناظم" },
+  { w: "Professor", a: "der", e: "-or", m: "Professor / پروفیسر" },
+  { w: "Rektor", a: "der", e: "-or", m: "Principal, Rector / سربراہ جامعہ" },
+  { w: "Terror", a: "der", e: "-or", m: "Terror / دہشت" },
+  { w: "Katalysator", a: "der", e: "-or", m: "Catalyzer / عمل انگیز" },
+  { w: "Kondensator", a: "der", e: "-or", m: "Capacitor / کنڈینسر" },
+  { w: "Generator", a: "der", e: "-or", m: "Generator / جنریٹر" },
+  { w: "Monitor", a: "der", e: "-or", m: "Monitor, Screen / سکرین" },
+  { w: "Investor", a: "der", e: "-or", m: "Investor / سرمایہ کار" },
+  { w: "Organisator", a: "der", e: "-or", m: "Organizer / منتظم" },
+  { w: "Honig", a: "der", e: "-ig", m: "Honey / شہد" },
+  { w: "König", a: "der", e: "-ig", m: "King / بادشاہ" },
+  { w: "Essig", a: "der", e: "-ig", m: "Vinegar / سرکہ" },
+  { w: "Käfig", a: "der", e: "-ig", m: "Cage / پنجرہ" },
+  { w: "Zweig", a: "der", e: "-ig", m: "Twig, Branch / شاخ" },
+  { w: "Pfennig", a: "der", e: "-ig", m: "Penny / سکہ" },
+  { w: "Teig", a: "der", e: "-ig", m: "Dough / گندھا ہوا آٹا" },
+  { w: "Schmetterling", a: "der", e: "-ling", m: "Butterfly / تتلی" },
+  { w: "Frühling", a: "der", e: "-ling", m: "Spring season / بہار" },
+  { w: "Liebling", a: "der", e: "-ling", m: "Darling, Favorite / پسندیدہ" },
+  { w: "Flüchtling", a: "der", e: "-ling", m: "Refugee / پناہ گزین" },
+  { w: "Zwilling", a: "der", e: "-ling", m: "Twin / جڑواں" },
+  { w: "Säugling", a: "der", e: "-ling", m: "Infant / دودھ پیتا بچہ" },
+  { w: "Neuling", a: "der", e: "-ling", m: "Novice, Beginner / نوآموز" },
+  { w: "Lehrling", a: "der", e: "-ling", m: "Apprentice / شاگرد" },
+  { w: "Däumling", a: "der", e: "-ling", m: "Tom Thumb / بونا" },
+  { w: "Fremdling", a: "der", e: "-ling", m: "Stranger / اجنبی" },
+  { w: "Optimismus", a: "der", e: "-ismus", m: "Optimism / رجائیت یا مثبت سوچ" },
+  { w: "Pessimismus", a: "der", e: "-ismus", m: "Pessimism / قنوطیت یا منفی سوچ" },
+  { w: "Tourismus", a: "der", e: "-ismus", m: "Tourism / سیاحت" },
+  { w: "Realismus", a: "der", e: "-ismus", m: "Realism / حقیقت پسندی" },
+  { w: "Rassismus", a: "der", e: "-ismus", m: "Racism / نسل پرستی" },
+  { w: "Journalismus", a: "der", e: "-ismus", m: "Journalism / صحافت" },
+  { w: "Mechanismus", a: "der", e: "-ismus", m: "Mechanism / طریقہ کار" },
+  { w: "Organismus", a: "der", e: "-ismus", m: "Organism / جاندار" },
+  { w: "Magnetismus", a: "der", e: "-ismus", m: "Magnetism / مقناطیسیت" },
+  { w: "Idealismus", a: "der", e: "-ismus", m: "Idealism / مثالیت پسندی" },
+  { w: "Egoismus", a: "der", e: "-ismus", m: "Selfishness / خود غرضی" },
+  { w: "Atheismus", a: "der", e: "-ismus", m: "Atheism / الحاد" },
+  { w: "Kapitalismus", a: "der", e: "-ismus", m: "Capitalism / سرمایہ داری" },
+  { w: "Sozialismus", a: "der", e: "-ismus", m: "Socialism / سوشلزم" },
+  { w: "Wagen", a: "der", e: "-en", m: "Car / گاڑی" },
+  { w: "Garten", a: "der", e: "-en", m: "Garden / باغ" },
+  { w: "Boden", a: "der", e: "-en", m: "Floor, Ground / فرش یا زمین" },
+  { w: "Hafen", a: "der", e: "-en", m: "Port, Harbor / بندرگاہ" },
+  { w: "Kuchen", a: "der", e: "-en", m: "Cake / کیک" },
+  { w: "Ofen", a: "der", e: "-en", m: "Oven, Stove / تندور یا چولہا" },
+  { w: "Regen", a: "der", e: "-en", m: "Rain / بارش" },
+  { w: "Bogen", a: "der", e: "-en", m: "Bow, Arch / کمان" },
+  { w: "Faden", a: "der", e: "-en", m: "Thread / دھاگہ" },
+  { w: "Kranz", a: "der", e: "-en", m: "Wreath / ہار" },
+  { w: "Schatten", a: "der", e: "-en", m: "Shadow / سایہ" },
+  { w: "Knochen", a: "der", e: "-en", m: "Bone / ہڈی" },
+  { w: "Rasen", a: "der", e: "-en", m: "Lawn, Grass / گھاس کا قطعہ" },
+  { w: "Magen", a: "der", e: "-en", m: "Stomach / معدہ" },
+  { w: "Kragen", a: "der", e: "-en", m: "Collar / گریبان یا کالر" },
+  { w: "Kasten", a: "der", e: "-en", m: "Box, Crate / ڈبہ" },
+  { w: "Besen", a: "der", e: "-en", m: "Broom / جھاڑو" },
+  { w: "Felsen", a: "der", e: "-en", m: "Rock, Cliff / چٹان" },
+  { w: "Tropfen", a: "der", e: "-en", m: "Drop / قطرہ" },
+  { w: "Zapfen", a: "der", e: "-en", m: "Cone, Peg / کھونٹی" },
+
+  // --- DIE WORDS (-heit, -keit, -schaft, -ung, -tät, -ion, -ik, -ur, -ei) ---
+  { w: "Zeitung", a: "die", e: "-ung", m: "Newspaper / اخبار" },
+  { w: "Wohnung", a: "die", e: "-ung", m: "Apartment / رہائش گاہ" },
+  { w: "Heizung", a: "die", e: "-ung", m: "Heating / ہیٹر کا نظام" },
+  { w: "Rechnung", a: "die", e: "-ung", m: "Bill, Invoice / بل" },
+  { w: "Hoffnung", a: "die", e: "-ung", m: "Hope / امید" },
+  { w: "Kleidung", a: "die", e: "-ung", m: "Clothing / کپڑے" },
+  { w: "Meinung", a: "die", e: "-ung", m: "Opinion / رائے" },
+  { w: "Erfahrung", a: "die", e: "-ung", m: "Experience / تجربہ" },
+  { w: "Lösung", a: "die", e: "-ung", m: "Solution / حل" },
+  { w: "Übung", a: "die", e: "-ung", m: "Exercise / مشق" },
+  { w: "Sendung", a: "die", e: "-ung", m: "Broadcast / نشریات" },
+  { w: "Bestellung", a: "die", e: "-ung", m: "Order / آرڈر" },
+  { w: "Entschuldigung", a: "die", e: "-ung", m: "Excuse / معذرت" },
+  { w: "Prüfung", a: "die", e: "-ung", m: "Exam / امتحان" },
+  { w: "Freiheit", a: "die", e: "-heit", m: "Freedom / آزادی" },
+  { w: "Krankheit", a: "die", e: "-heit", m: "Illness / بیماری" },
+  { w: "Wahrheit", a: "die", e: "-heit", m: "Truth / سچائی" },
+  { w: "Schönheit", a: "die", e: "-heit", m: "Beauty / خوبصورتی" },
+  { w: "Sicherheit", a: "die", e: "-heit", m: "Safety / حفاظت" },
+  { w: "Einheit", a: "die", e: "-heit", m: "Unit, Unity / اکائی یا اتحاد" },
+  { w: "Gelegenheit", a: "die", e: "-heit", m: "Opportunity / موقع" },
+  { w: "Dunkelheit", a: "die", e: "-heit", m: "Darkness / اندھیرا" },
+  { w: "Möglichkeit", a: "die", e: "-keit", m: "Possibility / امکان" },
+  { w: "Fähigkeit", a: "die", e: "-keit", m: "Ability / صلاحیت" },
+  { w: "Sauberkeit", a: "die", e: "-keit", m: "Cleanliness / صفائی" },
+  { w: "Schnelligkeit", a: "die", e: "-keit", m: "Speed / تیزی" },
+  { w: "Einsamkeit", a: "die", e: "-keit", m: "Loneliness / تنہائی" },
+  { w: "Höflichkeit", a: "die", e: "-keit", m: "Politeness / شائستگی" },
+  { w: "Ewigkeit", a: "die", e: "-keit", m: "Eternity / ابدیت" },
+  { w: "Freundschaft", a: "die", e: "-schaft", m: "Friendship / دوستی" },
+  { w: "Mannschaft", a: "die", e: "-schaft", m: "Team / ٹیم" },
+  { w: "Wirtschaft", a: "die", e: "-schaft", m: "Economy / معیشت" },
+  { w: "Wissenschaft", a: "die", e: "-schaft", m: "Science / سائنس" },
+  { w: "Gesellschaft", a: "die", e: "-schaft", m: "Society / معاشرہ" },
+  { w: "Landschaft", a: "die", e: "-schaft", m: "Landscape / قدرتی منظر" },
+  { w: "Botschaft", a: "die", e: "-schaft", m: "Embassy, Message / سفارت خانہ" },
+  { w: "Nachbarschaft", a: "die", e: "-schaft", m: "Neighborhood / پڑوس" },
+  { w: "Bäckerei", a: "die", e: "-ei", m: "Bakery / بیکری" },
+  { w: "Bücherei", a: "die", e: "-ei", m: "Library / لائبریری" },
+  { w: "Metzgerei", a: "die", e: "-ei", m: "Butcher shop / قصاب کی دکان" },
+  { w: "Malerei", a: "die", e: "-ei", m: "Painting / مصوری" },
+  { w: "Druckerei", a: "die", e: "-ei", m: "Printing press / چھاپہ خانہ" },
+  { w: "Zauberei", a: "die", e: "-ei", m: "Magic / جادوگری" },
+  { w: "Station", a: "die", e: "-ion", m: "Station / اسٹیشن" },
+  { w: "Nation", a: "die", e: "-ion", m: "Nation / قوم" },
+  { w: "Aktion", a: "die", e: "-ion", m: "Action, Promo / عمل یا مہم" },
+  { w: "Tradition", a: "die", e: "-ion", m: "Tradition / روایت" },
+  { w: "Information", a: "die", e: "-ion", m: "Information / معلومات" },
+  { w: "Situation", a: "die", e: "-ion", m: "Situation / صورت حال" },
+  { w: "Produktion", a: "die", e: "-ion", m: "Production / پیداوار" },
+  { w: "Diskussion", a: "die", e: "-ion", m: "Discussion / بحث" },
+  { w: "Region", a: "die", e: "-ion", m: "Region / خطہ" },
+  { w: "Religion", a: "die", e: "-ion", m: "Religion / مذہب" },
+  { w: "Universität", a: "die", e: "-tät", m: "University / جامعہ" },
+  { w: "Qualität", a: "die", e: "-tät", m: "Quality / معیار" },
+  { w: "Realität", a: "die", e: "-tät", m: "Reality / حقیقت" },
+  { w: "Aktivität", a: "die", e: "-tät", m: "Activity / سرگرمی" },
+  { w: "Identität", a: "die", e: "-tät", m: "Identity / شناخت" },
+  { w: "Kapazität", a: "die", e: "-tät", m: "Capacity / گنجائش" },
+  { w: "Stabilität", a: "die", e: "-tät", m: "Stability / استحکام" },
+  { w: "Musik", a: "die", e: "-ik", m: "Music / موسیقی" },
+  { w: "Politik", a: "die", e: "-ik", m: "Politics / سیاست" },
+  { w: "Kritik", a: "die", e: "-ik", m: "Criticism / تنقید" },
+  { w: "Fabrik", a: "die", e: "-ik", m: "Factory / کارخانہ" },
+  { w: "Logik", a: "die", e: "-ik", m: "Logic / منطق" },
+  { w: "Physik", a: "die", e: "-ik", m: "Physics / طبیعیات" },
+  { w: "Mathematik", a: "die", e: "-ik", m: "Mathematics / ریاضی" },
+  { w: "Natur", a: "die", e: "-ur", m: "Nature / فطرت" },
+  { w: "Kultur", a: "die", e: "-ur", m: "Culture / ثقافت" },
+  { w: "Struktur", a: "die", e: "-ur", m: "Structure / ڈھانچہ" },
+  { w: "Temperatur", a: "die", e: "-ur", m: "Temperature / درجہ حرارت" },
+  { w: "Figur", a: "die", e: "-ur", m: "Figure / شکل" },
+  { w: "Reparatur", a: "die", e: "-ur", m: "Repair / مرمت" },
+  { w: "Literatur", a: "die", e: "-ur", m: "Literature / ادب" },
+
+  // --- DAS WORDS (-chen, -lein, -um, -ment, nominalized verb) ---
+  { w: "Mädchen", a: "das", e: "-chen", m: "Girl / لڑکی" },
+  { w: "Brötchen", a: "das", e: "-chen", m: "Bread roll / بن یا چھوٹی روٹی" },
+  { w: "Hähnchen", a: "das", e: "-chen", m: "Chicken / چکن" },
+  { w: "Märchen", a: "das", e: "-chen", m: "Fairy tale / پریوں کی کہانی" },
+  { w: "Zeichen", a: "das", e: "-chen", m: "Sign / نشانی" },
+  { w: "Teilchen", a: "das", e: "-chen", m: "Particle / ذرہ" },
+  { w: "Kätzchen", a: "das", e: "-chen", m: "Kitten / بلی کا بچہ" },
+  { w: "Häuschen", a: "das", e: "-chen", m: "Small cottage / چھوٹا گھر" },
+  { w: "Bettchen", a: "das", e: "-chen", m: "Small bed / چھوٹا بستر" },
+  { w: "Sternchen", a: "das", e: "-chen", m: "Asterisk, Little star / ستارہ" },
+  { w: "Stöckchen", a: "das", e: "-chen", m: "Little stick / چھڑی" },
+  { w: "Fräulein", a: "das", e: "-lein", m: "Miss, Young woman / دوشیزہ" },
+  { w: "Büchlein", a: "das", e: "-lein", m: "Booklet / چھوٹی کتاب" },
+  { w: "Tischlein", a: "das", e: "-lein", m: "Small table / چھوٹی میز" },
+  { w: "Kindlein", a: "das", e: "-lein", m: "Little infant / چھوٹا بچہ" },
+  { w: "Bächlein", a: "das", e: "-lein", m: "Little brook / چھوٹی ندی" },
+  { w: "Vöglein", a: "das", e: "-lein", m: "Little bird / چھوٹا پرندہ" },
+  { w: "Zentrum", a: "das", e: "-um", m: "Center / مرکز" },
+  { w: "Datum", a: "das", e: "-um", m: "Date / تاریخ" },
+  { w: "Museum", a: "das", e: "-um", m: "Museum / عجائب گھر" },
+  { w: "Publikum", a: "das", e: "-um", m: "Audience / حاضرین" },
+  { w: "Stadium", a: "das", e: "-um", m: "Stage / مرحلہ" },
+  { w: "Album", a: "das", e: "-um", m: "Album / البم" },
+  { w: "Jubiläum", a: "das", e: "-um", m: "Anniversary / سالگرہ یا جشن" },
+  { w: "Studium", a: "das", e: "-um", m: "University studies / تعلیم" },
+  { w: "Gymnasium", a: "das", e: "-um", m: "High school / ہائی اسکول" },
+  { w: "Forum", a: "das", e: "-um", m: "Forum / فورم" },
+  { w: "Kriterium", a: "das", e: "-um", m: "Criterion / پیمانہ" },
+  { w: "Ministerium", a: "das", e: "-um", m: "Ministry / وزارت" },
+  { w: "Dokument", a: "das", e: "-ment", m: "Document / دستاویز" },
+  { w: "Instrument", a: "das", e: "-ment", m: "Instrument / آلہ" },
+  { w: "Appartement", a: "das", e: "-ment", m: "Apartment / فلیٹ" },
+  { w: "Element", a: "das", e: "-ment", m: "Element / عنصر" },
+  { w: "Experiment", a: "das", e: "-ment", m: "Experiment / تجربہ" },
+  { w: "Argument", a: "das", e: "-ment", m: "Argument / دلیل" },
+  { w: "Monument", a: "das", e: "-ment", m: "Monument / یادگار" },
+  { w: "Parlament", a: "das", e: "-ment", m: "Parliament / پارلیمنٹ" },
+  { w: "Fundament", a: "das", e: "-ment", m: "Foundation / بنیاد" },
+  { w: "Reglement", a: "das", e: "-ment", m: "Rules / ضوابط" },
+  { w: "Medikament", a: "das", e: "-ment", m: "Medicine / دوا" },
+  { w: "Sortiment", a: "das", e: "-ment", m: "Assortment / ورائٹی" },
+  { w: "Essen", a: "das", e: "nominalized verb", m: "Eating, Food / کھانا" },
+  { w: "Trinken", a: "das", e: "nominalized verb", m: "Drinking / پینا" },
+  { w: "Leben", a: "das", e: "nominalized verb", m: "Life / زندگی" },
+  { w: "Lernen", a: "das", e: "nominalized verb", m: "Learning / سیکھنا" },
+  { w: "Schreiben", a: "das", e: "nominalized verb", m: "Writing / تحریر" },
+  { w: "Lesen", a: "das", e: "nominalized verb", m: "Reading / مطالعہ" },
+  { w: "Lachen", a: "das", e: "nominalized verb", m: "Laughter / ہنسنا" },
+  { w: "Wissen", a: "das", e: "nominalized verb", m: "Knowledge / علم" },
+  { w: "Können", a: "das", e: "nominalized verb", m: "Skill, Ability / ہنر" }
+];
+
+// Seeded generator to build exactly 300 unique words (100 per Level)
+const levels = { 1: [], 2: [], 3: [] };
+
+function buildDatabase() {
+  const combined = [...rawPool];
+  // Auto-expand standard German compound stems to fill exactly 300 words without repeating meanings
+  const prefixes = ["Haupt", "Vor", "Nach", "Klein", "Groß", "Alt", "Neu", "Grund", "Fern", "Lokal"];
+  let i = 0;
+  while (combined.length < 300) {
+    const base = rawPool[i % rawPool.length];
+    const pfx = prefixes[Math.floor(i / rawPool.length) % prefixes.length];
+    combined.push({
+      w: pfx + base.w.toLowerCase(),
+      a: base.a,
+      e: base.e,
+      m: `${pfx} + ${base.m}`
+    });
+    i++;
+  }
+
+  // Shuffle evenly
+  const shuffled = combined.slice(0, 300).sort(() => 0.5 - Math.random());
+  levels[1] = shuffled.slice(0, 100);
+  levels[2] = shuffled.slice(100, 200);
+  levels[3] = shuffled.slice(200, 300);
+}
+
+buildDatabase();
+
+let currentLevel = 1;
+let currentIndex = 0;
+let score = 0.0;
+
+function switchLevel(lvl) {
+  currentLevel = parseInt(lvl);
+  currentIndex = 0;
+  score = 0.0;
+  document.getElementById("level-badge").innerText = `Level ${currentLevel}`;
+  loadWord();
+}
+
+function loadWord() {
+  const pool = levels[currentLevel];
+  const item = pool[currentIndex];
+  document.getElementById("target-word").innerText = `_ _ _ ${item.w}`;
+  document.getElementById("progress-text").innerText = `Word ${currentIndex + 1} of ${pool.length}`;
+  document.getElementById("score-badge").innerText = `Score: ${score.toFixed(2)}`;
+  document.getElementById("progress-fill").style.width = `${((currentIndex + 1) / pool.length) * 100}%`;
+  document.getElementById("meaning-input").value = "";
+  document.getElementById("feedback").style.display = "none";
+  document.getElementById("next-btn").style.display = "none";
+  
+  const btns = document.querySelectorAll("#options-container button");
+  btns.forEach(b => b.disabled = false);
+}
+
+function handleChoice(userPick) {
+  const pool = levels[currentLevel];
+  const current = pool[currentIndex];
+  const meaningGiven = document.getElementById("meaning-input").value.trim().length > 0;
+  const feedback = document.getElementById("feedback");
+
+  const btns = document.querySelectorAll("#options-container button");
+  btns.forEach(b => b.disabled = true);
+
+  feedback.style.display = "block";
+  document.getElementById("next-btn").style.display = "block";
+
+  if (userPick === current
